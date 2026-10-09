@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lost &amp; Found Hub - Community Recovery Network</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+<input accept=".json,application/json" class="hidden" id="import-json-file" onchange="handleImportFile(event)" type="file"/>
+<!-- Top AI Alert Banner -->
+<aside class="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white px-4 py-2 text-xs shadow-xs z-30 flex items-center justify-between" id="ai-alert-banner">
+<div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between w-full gap-2">
+<div class="flex items-center gap-2">
+<span class="px-1.5 py-0.5 rounded bg-white/20 font-bold uppercase text-[10px]">AI MATCH</span>
+<span class="font-medium text-blue-100">94% candidate match found:</span>
+<strong class="font-bold text-white">Lost Dog "Cooper" ⇄ Sighted Golden Retriever</strong>
+<span class="bg-amber-400/25 text-amber-200 border border-amber-300/40 px-2 py-0.5 rounded-full font-bold text-[10px]">💰 $150 Escrow Bounty</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-2.5 py-1 bg-white text-blue-800 hover:bg-blue-50 rounded-md font-bold text-xs flex items-center gap-1" onclick="openAIMatchModal()">
+<i class="w-3.5 h-3.5 text-blue-600" data-lucide="sparkles"></i> Compare Reports
+        </button>
+<button class="text-blue-200 hover:text-white p-1" onclick="document.getElementById('ai-alert-banner').classList.add('hidden')">
+<i class="w-3.5 h-3.5" data-lucide="x"></i>
+</button>
+</div>
+</div>
+</aside>
+<!-- Top Header Navigation -->
+<header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+<div class="flex items-center space-x-3 cursor-pointer shrink-0" onclick="switchNavTab('dash')">
+<div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm">
+<i class="w-5 h-5" data-lucide="compass"></i>
+</div>
+<div>
+<span class="text-lg font-bold text-blue-900 leading-tight">Lost &amp; Found <span class="text-blue-600">Hub</span></span>
+<p class="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Community Recovery Network</p>
+</div>
+</div>
+<nav class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl">
+<button class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 shadow-xs flex items-center gap-1.5" id="nav-btn-dash" onclick="switchNavTab('dash')">
+<i class="w-3.5 h-3.5" data-lucide="layout-grid"></i> <span>Dashboard &amp; Map</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1.5" id="nav-btn-report" onclick="switchNavTab('report')">
+<i class="w-3.5 h-3.5" data-lucide="plus-circle"></i> <span>Report Item</span>
+</button>
+</nav>
+<div class="flex items-center gap-2">
+<div class="hidden xl:flex items-center bg-slate-100 hover:bg-slate-200/80 p-1 rounded-lg border border-slate-200 cursor-pointer" onclick="openCloudModal()">
+<div class="flex items-center gap-1.5 px-2 py-0.5 text-xs text-slate-700 font-semibold">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>Cloud Synced</span>
+</div>
+<button class="p-1 hover:bg-white rounded text-blue-600" onclick="event.stopPropagation(); triggerCloudSync();" title="Sync now">
+<i class="w-3.5 h-3.5" data-lucide="refresh-cw"></i>
+</button>
+</div>
+<div class="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+<button class="px-2 py-1 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-white rounded transition flex items-center gap-1" onclick="exportJSON()">
+<i class="w-3.5 h-3.5 text-blue-600" data-lucide="download"></i> Export
+          </button>
+<button class="px-2 py-1 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-white rounded transition flex items-center gap-1" onclick="document.getElementById('import-json-file').click()">
+<i class="w-3.5 h-3.5 text-blue-600" data-lucide="upload"></i> Import
+          </button>
+</div>
+<button class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" id="auth-btn" onclick="toggleAuth()">
+<i class="w-3.5 h-3.5" data-lucide="log-in"></i> <span id="auth-label">Login to Post</span>
+</button>
+</div>
+</div>
+</header>
+<div class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none" id="toast-shelf"></div>
+<!-- Main Body Content -->
+<main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+<!-- VIEW 1: DASHBOARD -->
+<section class="tab-pane active space-y-6" id="pane-dash">
+<!-- Top Recovery Network Analytics Bar (Feature 5) -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+<div class="p-2">
+<div class="text-xl font-black text-slate-900 tracking-tight">82.4%</div>
+<p class="text-[11px] font-medium text-slate-500">Recovery Rate (&lt;48h)</p>
+</div>
+<div class="p-2 border-l border-slate-100">
+<div class="text-xl font-black text-slate-900 tracking-tight">14.2 hrs</div>
+<p class="text-[11px] font-medium text-slate-500">Avg Return Time (Pets)</p>
+</div>
+<div class="p-2 border-l border-slate-100">
+<div class="text-xl font-black text-slate-900 tracking-tight">1,420+</div>
+<p class="text-[11px] font-medium text-slate-500">Total Reunited Items</p>
+</div>
+<div class="p-2 border-l border-slate-100">
+<div class="text-xl font-black text-amber-700 tracking-tight">$8,450</div>
+<p class="text-[11px] font-medium text-slate-500">Escrow Pledges Paid</p>
+</div>
+</div>
+<!-- Flagship Sub-Tabs Switcher -->
+<div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+<div class="flex items-center gap-1.5 bg-slate-200/70 p-1 rounded-xl">
+<button class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 shadow-xs flex items-center gap-1.5" id="subbtn-map" onclick="switchSubPane('map')">
+<i class="w-3.5 h-3.5" data-lucide="map"></i> <span>Live Map &amp; Feed</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1.5" id="subbtn-radar" onclick="switchSubPane('radar')">
+<i class="w-3.5 h-3.5 text-amber-600" data-lucide="radar"></i> <span>🎯 Nearby Radar (500m - 5km)</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1.5" id="subbtn-analytics" onclick="switchSubPane('analytics')">
+<i class="w-3.5 h-3.5 text-indigo-600" data-lucide="trophy"></i> <span>📊 Analytics &amp; Heroes</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 shadow-2xs flex items-center gap-1.5" onclick="openFlyerModal('item-1')">
+<i class="w-3.5 h-3.5 text-rose-600" data-lucide="printer"></i> <span>Generate Notice Flyer</span>
+</button>
+<button class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 flex items-center gap-1.5" onclick="focusNearestSafeZone()">
+<i class="w-3.5 h-3.5 text-emerald-600" data-lucide="shield"></i> <span>Nearest Safe Zone</span>
+</button>
+</div>
+</div>
+<!-- SUBTAB 1: LIVE MAP & FEED -->
+<div class="subtab-pane active space-y-5" id="subpane-map">
+<!-- Quick System Feature Bar (4 Pillars) -->
+<div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col gap-3">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-100 pb-2.5">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+<h2 class="text-sm font-bold text-slate-900">Essential Recovery Toolkit (Active Systems)</h2>
+</div>
+<span class="text-xs text-slate-500 font-medium">Safe Exchange • QR Posters • Radar • Escrow Pledges</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+<!-- 1. AI Match -->
+<button class="p-3.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100/60 transition text-left flex flex-col justify-between" onclick="openAIMatchModal()">
+  <div>
+    <div class="flex items-center justify-between mb-1.5">
+      <span class="p-1.5 rounded-lg bg-blue-600 text-white"><i class="w-4 h-4" data-lucide="cpu"></i></span>
+      <span id="card-ai-badge" class="text-[10px] uppercase font-extrabold bg-blue-600 text-white px-2 py-0.5 rounded-full">94% Match</span>
+    </div>
+    <h4 class="font-bold text-xs sm:text-sm text-slate-900">AI Sighting Engine</h4>
+    <p id="card-ai-sub" class="text-[11px] text-slate-600 mt-0.5">Cooper ⇄ Sighted Retriever</p>
+  </div>
+  <span class="text-[11px] font-bold text-blue-700 mt-2 flex items-center gap-0.5">Compare Reports <i class="w-3.5 h-3.5" data-lucide="chevron-right"></i></span>
+</button>
+
+<!-- 2. Safe Exchange Zones -->
+<button class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/60 transition text-left flex flex-col justify-between" onclick="focusNearestSafeZone()">
+  <div>
+    <div class="flex items-center justify-between mb-1.5">
+      <span class="p-1.5 rounded-lg bg-emerald-600 text-white"><i class="w-4 h-4" data-lucide="shield-check"></i></span>
+      <span id="card-safe-badge" class="text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full">2 Verified</span>
+    </div>
+    <h4 class="font-bold text-xs sm:text-sm text-slate-900">Safe Exchange Zones</h4>
+    <p id="card-safe-sub" class="text-[11px] text-slate-600 mt-0.5 truncate">สภ.เมืองลำปาง &amp; เทศบาลนครลำปาง</p>
+  </div>
+  <span class="text-[11px] font-bold text-emerald-800 mt-2 flex items-center gap-0.5">View On Map <i class="w-3.5 h-3.5" data-lucide="chevron-right"></i></span>
+</button>
+<!-- 3. Printable Flyer Generator -->
+<button class="p-3.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/60 transition text-left flex flex-col justify-between" onclick="openFlyerModal('item-1')">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="p-1.5 rounded-lg bg-rose-600 text-white"><i class="w-4 h-4" data-lucide="printer"></i></span>
+<span class="text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-full">Print Ready</span>
+</div>
+<h4 class="font-bold text-xs sm:text-sm text-slate-900">Print Notice &amp; QR Flyer</h4>
+<p class="text-[11px] text-slate-600 mt-0.5">Tear-off slips &amp; anonymous QR</p>
+</div>
+<span class="text-[11px] font-bold text-rose-700 mt-2 flex items-center gap-0.5">Generate Poster <i class="w-3.5 h-3.5" data-lucide="chevron-right"></i></span>
+</button>
+<!-- 4. Escrow Bounties -->
+<button class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/60 transition text-left flex flex-col justify-between" onclick="openClaimModal('item-2', 'Apple AirPods Pro in Green Silicone Case')">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="p-1.5 rounded-lg bg-amber-600 text-white"><i class="w-4 h-4" data-lucide="badge-dollar-sign"></i></span>
+<span class="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-full">Escrow Active</span>
+</div>
+<h4 class="font-bold text-xs sm:text-sm text-slate-900">Ownership &amp; Escrow</h4>
+<p class="text-[11px] text-slate-600 mt-0.5">Serial check &amp; secured bounty</p>
+</div>
+<span class="text-[11px] font-bold text-amber-800 mt-2 flex items-center gap-0.5">Validate Claim <i class="w-3.5 h-3.5" data-lucide="chevron-right"></i></span>
+</button>
+</div>
+</div>
+<!-- Filter Controls -->
+<div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+<div>
+<h1 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+              Community Lost &amp; Found Activity
+              <span class="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-semibold" id="stats-pill">3 Active</span>
+</h1>
+<p class="text-xs text-slate-500">Live geolocated pins with Safe Exchange custody hubs &amp; verified escrow pledges.</p>
+</div>
+<div class="flex flex-wrap items-center gap-2">
+<div class="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
+<span class="text-slate-500 pl-1 font-semibold">Role:</span>
+<select class="border-0 bg-transparent py-0.5 text-xs text-slate-800 font-medium cursor-pointer" id="filt-role" onchange="runFilter()">
+<option value="all">All Roles</option>
+<option value="lost">Lost Only (Red)</option>
+<option value="found">Found Only (Blue)</option>
+</select>
+</div>
+<div class="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
+<span class="text-slate-500 pl-1 font-semibold">Status:</span>
+<select class="border-0 bg-transparent py-0.5 text-xs text-slate-800 font-medium cursor-pointer" id="filt-status" onchange="runFilter()">
+<option value="all">All Status</option>
+<option selected="" value="active">Active Only</option>
+<option value="resolved">Resolved</option>
+</select>
+</div>
+<div class="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
+<span class="text-slate-500 pl-1 font-semibold">Category:</span>
+<select class="border-0 bg-transparent py-0.5 text-xs text-slate-800 font-medium cursor-pointer" id="filt-category" onchange="runFilter()">
+<option value="all">All Categories</option>
+<option value="Pets">Pets</option>
+<option value="Electronics">Electronics</option>
+<option value="Wallet">Wallet</option>
+<option value="Keys">Keys</option>
+<option value="Other">Other</option>
+</select>
+</div>
+<button class="p-2 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg" onclick="resetFilters()" title="Reset Filters">
+<i class="w-4 h-4" data-lucide="rotate-ccw"></i>
+</button>
+</div>
+</div>
+<!-- Main Dashboard Split (Map + Feed) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- Left Map (7 cols) -->
+<div class="lg:col-span-7 space-y-3">
+<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs flex flex-col">
+<div class="p-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/70">
+<div class="flex items-center gap-2">
+<i class="w-4 h-4 text-blue-600" data-lucide="map"></i>
+<h3 class="font-bold text-xs sm:text-sm text-slate-900">Live Geographic Distribution</h3>
+</div>
+<div class="flex items-center gap-2.5 text-xs">
+<!-- Safe Zone Toggle Button (Feature 1) -->
+<button class="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold border border-emerald-300 rounded-lg hover:bg-emerald-100 flex items-center gap-1 text-[11px]" id="safezone-toggle-btn" onclick="toggleSafeZoneLayer()">
+<i class="w-3.5 h-3.5 text-emerald-600" data-lucide="shield-check"></i>
+<span id="safezone-toggle-text">🛡️ Safe Exchange Zones: ON</span>
+</button>
+<span class="flex items-center gap-1 text-slate-600 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Lost</span>
+<span class="flex items-center gap-1 text-slate-600 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Found</span>
+</div>
+</div>
+<!-- Map Container -->
+<div class="w-full h-[480px] bg-slate-100 relative z-10" id="main-map"></div>
+<div class="p-3 bg-white border-t border-slate-100 text-xs text-slate-500 flex flex-wrap items-center justify-between gap-2">
+<span class="flex items-center gap-1">
+<i class="w-3.5 h-3.5 text-slate-400" data-lucide="info"></i>
+                  Green badges represent verified 24/7 public exchange zones with video surveillance.
+                </span>
+<div class="flex items-center gap-2">
+<button class="text-emerald-700 font-bold hover:underline flex items-center gap-1" onclick="focusNearestSafeZone()">
+<i class="w-3.5 h-3.5" data-lucide="shield"></i> Nearest Safe Spot
+                  </button>
+<button class="text-blue-600 font-semibold hover:underline flex items-center gap-1" onclick="centerMap()">
+<i class="w-3.5 h-3.5" data-lucide="locate"></i> Center View
+                  </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Feed (5 cols) -->
+<div class="lg:col-span-5 space-y-3.5">
+<div class="flex items-center justify-between">
+<h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+<i class="w-4 h-4 text-blue-600" data-lucide="list-ordered"></i> Recent Reports
+              </h3>
+<span class="text-xs text-slate-500 font-medium" id="feed-count">Showing 3 items</span>
+</div>
+<div class="space-y-3 max-h-[560px] overflow-y-auto pr-1" id="feed-list">
+<!-- Item Cards Populated by JS -->
+</div>
+</div>
+</div>
+</div>
+<!-- SUBTAB 2: RADAR & PERIMETER ALERTS (Feature 3) -->
+<div class="subtab-pane space-y-6" id="subpane-radar">
+<div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+<div>
+<div class="flex items-center gap-2">
+<span class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+<i class="w-4 h-4" data-lucide="radar"></i>
+</span>
+<h3 class="text-lg font-bold text-slate-900">Geo-Fenced Radius Alerts &amp; Proximity Radar</h3>
+</div>
+<p class="text-xs text-slate-500 mt-1">Configure your neighborhood perimeter to monitor lost pets and belongings within walking radius.</p>
+</div>
+<div class="flex items-center gap-3 bg-amber-50 border border-amber-200 p-2 px-3 rounded-xl">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="text-xs font-bold text-amber-900" id="radar-status-label">🔔 Proximity Push: ACTIVE</span>
+<button class="px-2 py-0.5 bg-white text-amber-800 text-[11px] font-bold rounded border border-amber-300" onclick="toggleRadarPush()">Toggle</button>
+</div>
+</div>
+<!-- Radar Slider Control -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center bg-slate-50 p-5 rounded-2xl border border-slate-200">
+<div class="md:col-span-2 space-y-2">
+<div class="flex items-center justify-between">
+<label class="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Alert Perimeter: <span class="text-blue-600 text-sm font-black" id="radar-slider-val">1.5 km</span>
+</label>
+<span class="text-xs text-slate-500">Coverage area: ~7.1 km²</span>
+</div>
+<input class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" id="radar-slider" max="5.0" min="0.5" oninput="handleRadarSlide(this.value)" step="0.1" type="range" value="1.5"/>
+<div class="flex justify-between text-[11px] font-mono text-slate-400">
+<span>500m (Immediate Block)</span>
+<span>2.5 km</span>
+<span>5.0 km (Full District)</span>
+</div>
+</div>
+<div class="bg-white p-4 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
+<div class="text-xs text-slate-500">Live Items Within Range</div>
+<div class="flex items-baseline gap-2">
+<span class="text-2xl font-black text-slate-900" id="radar-inrange-count">3 Items</span>
+<span class="text-xs font-bold text-emerald-600">✓ Monitored</span>
+</div>
+<button class="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5" onclick="testRadarPing()">
+<i class="w-3.5 h-3.5" data-lucide="bell-ring"></i> Test Proximity Broadcast
+              </button>
+</div>
+</div>
+<!-- Radar Feed Cards -->
+<div>
+<h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-2">
+<i class="w-3.5 h-3.5 text-amber-500" data-lucide="radio"></i> Urgent Items Within Perimeter
+            </h4>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="radar-cards-grid">
+<!-- Populated by JS -->
+</div>
+</div>
+</div>
+</div>
+<!-- SUBTAB 3: RECOVERY ANALYTICS & COMMUNITY HEROES (Feature 5) -->
+<div class="subtab-pane space-y-6" id="subpane-analytics">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<div class="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+<div>
+<div class="flex items-center gap-2">
+<span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+<i class="w-4 h-4" data-lucide="bar-chart-3"></i>
+</span>
+<h3 class="text-base font-bold text-slate-900">Recovery Network Analytics</h3>
+</div>
+<p class="text-xs text-slate-500 mt-0.5">Real-time statistics across safe custody meetups, AI matches, and escrow returns.</p>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+<div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+<span class="text-[10px] font-bold uppercase text-slate-500 block">Avg Pet Return</span>
+<span class="text-xl font-black text-slate-900 mt-0.5 block">14.2 Hours</span>
+<span class="text-[10px] text-emerald-600 font-semibold">3.4h faster with AI</span>
+</div>
+<div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+<span class="text-[10px] font-bold uppercase text-slate-500 block">Electronics Return</span>
+<span class="text-xl font-black text-slate-900 mt-0.5 block">26.0 Hours</span>
+<span class="text-[10px] text-blue-600 font-semibold">99.1% proof matched</span>
+</div>
+<div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+<span class="text-[10px] font-bold uppercase text-slate-500 block">Safe Zone Meetups</span>
+<span class="text-xl font-black text-emerald-700 mt-0.5 block">94.7%</span>
+<span class="text-[10px] text-emerald-700 font-semibold">0 reported issues</span>
+</div>
+</div>
+<div class="space-y-3 pt-2">
+<h4 class="text-xs font-bold uppercase tracking-wider text-slate-700">Resolution Rate by Category</h4>
+<div class="space-y-2">
+<div>
+<div class="flex justify-between text-xs font-medium mb-1">
+<span class="text-slate-700">Pets (Dogs, Cats, Birds)</span>
+<span class="font-bold text-slate-900">89.2% Resolved</span>
+</div>
+<div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-emerald-500 h-2 rounded-full" style="width:89.2%"></div></div>
+</div>
+<div>
+<div class="flex justify-between text-xs font-medium mb-1">
+<span class="text-slate-700">Electronics (Earbuds, Phones)</span>
+<span class="font-bold text-slate-900">78.5% Resolved</span>
+</div>
+<div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-blue-600 h-2 rounded-full" style="width:78.5%"></div></div>
+</div>
+<div>
+<div class="flex justify-between text-xs font-medium mb-1">
+<span class="text-slate-700">Wallets &amp; Identification</span>
+<span class="font-bold text-slate-900">84.1% Resolved</span>
+</div>
+<div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-indigo-600 h-2 rounded-full" style="width:84.1%"></div></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Community Heroes Leaderboard (Feature 5) -->
+<div class="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+<div class="flex items-center justify-between border-b border-slate-100 pb-3">
+<div class="flex items-center gap-2">
+<span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+<i class="w-4 h-4" data-lucide="award"></i>
+</span>
+<h4 class="font-bold text-slate-900">Community Heroes</h4>
+</div>
+<span class="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Top Recoveries</span>
+</div>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-3 rounded-xl bg-amber-50/70 border border-amber-200">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-amber-500 text-white font-black text-xs flex items-center justify-center">#1</div>
+<div>
+<h5 class="font-bold text-xs text-slate-900">Transit Officer Dave</h5>
+<p class="text-[11px] text-slate-500">MTA Custody Desk</p>
+</div>
+</div>
+<div class="text-right">
+<span class="text-sm font-black text-amber-900">15 Returns</span>
+<span class="block text-[10px] font-bold text-emerald-700">🌟 Gold Shield</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center">#2</div>
+<div>
+<h5 class="font-bold text-xs text-slate-900">Sarah M.</h5>
+<p class="text-[11px] text-slate-500">Park Volunteer</p>
+</div>
+</div>
+<div class="text-right">
+<span class="text-sm font-black text-slate-800">8 Returns</span>
+<span class="block text-[10px] font-bold text-indigo-700">🏅 Citizen Medal</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-amber-800/20 text-amber-800 font-bold text-xs flex items-center justify-center">#3</div>
+<div>
+<h5 class="font-bold text-xs text-slate-900">Marcus Chen</h5>
+<p class="text-[11px] text-slate-500">Greenpoint Host</p>
+</div>
+</div>
+<div class="text-right">
+<span class="text-sm font-black text-slate-800">6 Returns</span>
+<span class="block text-[10px] font-bold text-slate-600">🥉 Bronze Anchor</span>
+</div>
+</div>
+</div>
+<div class="bg-blue-50/70 p-3 rounded-xl border border-blue-100 text-xs text-blue-900 flex items-start gap-2">
+<i class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" data-lucide="shield-check"></i>
+<div>Handing over items at Safe Exchange Zones or resolving anonymous relays awards verified community karma and releases escrow rewards securely.</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- VIEW 2: REPORT ITEM VIEW -->
+<section class="tab-pane space-y-6" id="pane-report">
+<div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+<div>
+<h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+<i class="w-5 h-5 text-blue-600" data-lucide="file-plus-2"></i> Report a Lost or Found Item
+          </h2>
+<p class="text-xs text-slate-500 mt-0.5">Pin exact coordinates, attach optional escrow bounty pledge, and notify neighborhood radar.</p>
+</div>
+<button class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-blue-700 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 self-start md:self-auto" onclick="switchNavTab('dash')">
+<i class="w-3.5 h-3.5" data-lucide="arrow-left"></i> Back to Dashboard
+        </button>
+</div>
+<div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-3" id="auth-warning-box">
+<div class="flex items-center gap-3">
+<i class="w-5 h-5 text-amber-600" data-lucide="shield-alert"></i>
+<div>
+<h5 class="text-xs font-bold text-amber-900">Browsing as Guest</h5>
+<p class="text-xs text-amber-800">Log in to verify your identity and post reports or pledge escrow bounties.</p>
+</div>
+</div>
+<button class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold" onclick="toggleAuth()">Log In</button>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- Pinning Map (5 cols) -->
+<div class="lg:col-span-5 space-y-3">
+<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+<div class="p-3.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+<span class="text-xs font-bold text-blue-700">Step 1: Click Map to Pin Coordinates</span>
+<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800" id="pin-badge">Pin Required</span>
+</div>
+<div class="w-full h-[360px] bg-slate-100 relative" id="pin-map"></div>
+<div class="p-3 bg-slate-50 border-t border-slate-100 text-xs flex justify-between font-mono">
+<span>Lat: <strong id="disp-lat">None</strong></span>
+<span>Lng: <strong id="disp-lng">None</strong></span>
+</div>
+</div>
+</div>
+<!-- Submission Form (7 cols) -->
+<div class="lg:col-span-7">
+<form id="report-form" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4" onsubmit="handleFormSubmit(event)">
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-xs font-semibold text-slate-700 mb-1" for="f-type">Type <span class="text-red-500">*</span></label>
+      <select class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5" id="f-type" required="">
+        <option disabled="" selected="" value="">Select report type</option>
+        <option value="lost">I lost an item (Lost)</option>
+        <option value="found">I found an item (Found)</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-700 mb-1" for="f-category">Category <span class="text-red-500">*</span></label>
+      <select class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5" id="f-category" required="">
+        <option disabled="" selected="" value="">Select category</option>
+        <option value="Pets">Pets</option>
+        <option value="Electronics">Electronics</option>
+        <option value="Wallet">Wallet</option>
+        <option value="Keys">Keys</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+  </div>
+  <div>
+    <label class="block text-xs font-semibold text-slate-700 mb-1" for="f-name">Item Name / Summary <span class="text-red-500">*</span></label>
+    <input class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5" id="f-name" placeholder="e.g. Black Leather Bi-Fold Wallet" required="" type="text"/>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-xs font-semibold text-slate-700 mb-1" for="f-datetime">Date &amp; Time <span class="text-red-500">*</span></label>
+      <input class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5" id="f-datetime" required="" type="datetime-local"/>
+    </div>
+    <div>
+  <label class="block text-xs font-semibold text-slate-700 mb-1" for="f-contact">
+    Contact Info (เบอร์โทร หรือ อีเมล) <span class="text-red-500">*</span>
+  </label>
+  <input class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:bg-white" id="f-contact" placeholder="เช่น 081-234-5678 หรือ name@email.com" required="" type="text"/>
+</div>
+  </div>
+  <div>
+    <label class="block text-xs font-semibold text-slate-700 mb-1" for="f-image">Upload Photo <span class="text-red-500">*</span></label>
+    <input class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2" id="f-image" type="file" accept="image/*" required=""/>
+  </div>
+  <div>
+    <label class="block text-xs font-semibold text-slate-700 mb-1" for="f-desc">Description</label>
+    <textarea class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5" id="f-desc" placeholder="Distinct markings..." rows="2"></textarea>
+  </div>
+  
+  <input id="f-lat" type="hidden"/>
+  <input id="f-lng" type="hidden"/>
+  <button class="w-full py-3 bg-blue-600 disabled:bg-slate-300 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5" disabled="" id="f-submit" type="submit">
+    <i class="w-4 h-4" data-lucide="send"></i> <span id="f-submit-label">Pin Location on Map First</span>
+  </button>
+</form>
+</div>
+</div>
+</section>
+</main>
+<!-- =========================================================================
+       MODAL 1: PRINTABLE LOST NOTICE & QR FLYER GENERATOR (Feature 2)
+       ========================================================================= -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" id="flyer-modal">
+<div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onclick="closeFlyerModal()"></div>
+<div class="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full p-5 overflow-hidden z-10 space-y-4 max-h-[92vh] overflow-y-auto">
+<div class="flex items-center justify-between border-b border-slate-100 pb-3 no-print">
+<div class="flex items-center gap-2.5">
+<span class="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold"><i class="w-4 h-4" data-lucide="printer"></i></span>
+<div>
+<h3 class="font-bold text-slate-900 text-sm sm:text-base">Printable Notice &amp; QR Flyer Generator</h3>
+<p class="text-xs text-slate-500">Tear-off contact slips &amp; instant scannable QR relay code.</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 shadow-xs" onclick="window.print()">
+<i class="w-3.5 h-3.5" data-lucide="printer"></i> Print Poster
+          </button>
+<button class="text-slate-400 hover:text-slate-600 p-1" onclick="closeFlyerModal()"><i class="w-5 h-5" data-lucide="x"></i></button>
+</div>
+</div>
+<!-- PRINTABLE POSTER CONTAINER -->
+<div class="border-4 border-slate-900 bg-white p-5 rounded-xl space-y-4 text-slate-900" id="printable-flyer">
+<div class="bg-red-600 text-white text-center py-2.5 px-3 rounded-lg font-black tracking-widest text-xl uppercase border-2 border-red-700" id="fl-headline">
+          LOST PET - PLEASE HELP!
+        </div>
+<div class="bg-amber-100 border-2 border-amber-400 text-amber-900 text-center py-1.5 px-3 rounded-lg font-black text-xs uppercase flex items-center justify-center gap-1.5" id="fl-bounty-badge">
+<i class="w-4 h-4 text-amber-700" data-lucide="badge-dollar-sign"></i>
+<span id="fl-bounty-text">💰 $150 SECURED ESCROW REWARD FOR SAFE RETURN</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+<div class="w-full h-48 rounded-xl overflow-hidden border-2 border-slate-900 bg-slate-100 flex items-center justify-center">
+<img alt="Notice Photo" class="w-full h-full object-cover" id="fl-img" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+</div>
+<div class="space-y-2 text-xs">
+<div>
+<span class="text-[10px] font-bold uppercase text-slate-500">Identified Item / Pet</span>
+<h4 class="text-lg font-black text-slate-900" id="fl-name">Golden Retriever ("Cooper")</h4>
+</div>
+<div>
+<span class="text-[10px] font-bold uppercase text-slate-500">Last Seen</span>
+<p class="font-semibold text-slate-800" id="fl-timeplace">May 13, 2025 • Central Park East Meadow</p>
+</div>
+<div>
+<span class="text-[10px] font-bold uppercase text-slate-500">Distinct Markings</span>
+<p class="text-slate-700" id="fl-desc">Wearing blue reflective collar with bell. Very friendly, answers to whistling.</p>
+</div>
+</div>
+</div>
+<!-- Dynamic QR Relay Box -->
+<div class="border-2 border-dashed border-slate-400 p-3 rounded-xl flex items-center justify-between gap-3 bg-slate-50">
+<div class="space-y-0.5">
+<h5 class="font-bold text-xs text-slate-900 uppercase">Scan to Open Anonymous Chat Relay</h5>
+<p class="text-[11px] text-slate-600 leading-tight">Scan with any smartphone camera to message the owner anonymously or arrange a handoff at a verified Safe Exchange Zone.</p>
+<span class="text-[10px] font-mono text-blue-700 font-bold block pt-0.5">lostfoundhub.org/relay/item-1</span>
+</div>
+<div class="w-16 h-16 bg-white p-1 rounded-lg border border-slate-300 shrink-0 flex items-center justify-center">
+<svg class="w-full h-full text-slate-900" viewbox="0 0 100 100">
+<rect fill="#000" height="24" width="24" x="5" y="5"></rect>
+<rect fill="#fff" height="14" width="14" x="10" y="10"></rect>
+<rect fill="#000" height="6" width="6" x="14" y="14"></rect>
+<rect fill="#000" height="24" width="24" x="71" y="5"></rect>
+<rect fill="#fff" height="14" width="14" x="76" y="10"></rect>
+<rect fill="#000" height="6" width="6" x="80" y="14"></rect>
+<rect fill="#000" height="24" width="24" x="5" y="71"></rect>
+<rect fill="#fff" height="14" width="14" x="10" y="76"></rect>
+<rect fill="#000" height="6" width="6" x="14" y="80"></rect>
+<rect fill="#000" height="8" width="8" x="35" y="10"></rect>
+<rect fill="#000" height="8" width="8" x="50" y="15"></rect>
+<rect fill="#000" height="12" width="12" x="44" y="44"></rect>
+<rect fill="#000" height="6" width="6" x="65" y="40"></rect>
+<rect fill="#000" height="8" width="8" x="35" y="75"></rect>
+<rect fill="#000" height="8" width="8" x="60" y="70"></rect>
+<rect fill="#000" height="8" width="8" x="80" y="60"></rect>
+</svg>
+</div>
+</div>
+<!-- Tear-off contact slips -->
+<div class="pt-2 border-t-2 border-dashed border-slate-400">
+<span class="block text-center text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1.5">✂️ Tear-Off Slips (Cut along dashed lines) ✂️</span>
+<div class="grid grid-cols-4 sm:grid-cols-6 gap-1.5 text-center text-[9px] font-mono leading-tight">
+<div class="border border-slate-300 p-1 rounded bg-slate-50"><span class="font-bold block" id="slip-1">555-882-9901</span><span class="text-slate-500">LOST COOPER</span></div>
+<div class="border border-slate-300 p-1 rounded bg-slate-50"><span class="font-bold block" id="slip-2">555-882-9901</span><span class="text-slate-500">LOST COOPER</span></div>
+<div class="border border-slate-300 p-1 rounded bg-slate-50"><span class="font-bold block" id="slip-3">555-882-9901</span><span class="text-slate-500">LOST COOPER</span></div>
+<div class="border border-slate-300 p-1 rounded bg-slate-50"><span class="font-bold block" id="slip-4">555-882-9901</span><span class="text-slate-500">LOST COOPER</span></div>
+<div class="border border-slate-300 p-1 rounded bg-slate-50 hidden sm:block"><span class="font-bold block" id="slip-5">555-882-9901</span><span class="text-slate-500">LOST COOPER</span></div>
+<div class="border border-slate-300 p-1 rounded bg-slate-50 hidden sm:block"><span class="font-bold block" id="slip-6">555-882-9901</span><span class="text-slate-500">LOST COOPER</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- =========================================================================
+       MODAL 2: ANONYMOUS CONTACT RELAY WITH SAFE EXCHANGE SELECTOR (Feature 1)
+       ========================================================================= -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" id="relay-modal">
+<div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onclick="closeRelayModal()"></div>
+<div class="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 overflow-hidden z-10 space-y-3.5 max-h-[92vh] flex flex-col">
+<div class="flex items-start justify-between border-b border-slate-100 pb-2.5">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+<i class="w-5 h-5" data-lucide="shield-check"></i>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="text-sm sm:text-base font-bold text-slate-900">Encrypted Anonymous Relay</h3>
+<span class="text-[10px] font-mono uppercase bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">#RELAY-8821</span>
+</div>
+<p class="text-xs text-slate-500" id="relay-item-name">Item: Golden Retriever ("Cooper")</p>
+</div>
+</div>
+<button class="text-slate-400 hover:text-slate-600 p-1" onclick="closeRelayModal()"><i class="w-5 h-5" data-lucide="x"></i></button>
+</div>
+<!-- SAFE EXCHANGE ZONE SELECTOR (Feature 1) -->
+<div class="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3 space-y-2">
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-1 font-bold text-emerald-900">
+<i class="w-3.5 h-3.5 text-emerald-600" data-lucide="shield"></i> Select Safe Exchange Meetup Point (24/7 Monitored)
+          </div>
+<span class="text-[10px] text-emerald-700 font-medium">CCTV Secured</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+<select class="text-xs bg-white border border-emerald-300 rounded-lg p-2 font-medium text-slate-800" id="relay-safe-select">
+<option value="NYPD 108th Precinct - Main Lobby (24/7 CCTV)">NYPD 108th Precinct - Main Lobby (24/7 CCTV)</option>
+<option value="Brooklyn Public Library - Central Exchange">Brooklyn Public Library - Central Exchange</option>
+<option value="Grand Central MTA Transit Custody Desk">Grand Central MTA Transit Custody Desk</option>
+</select>
+<div class="flex gap-1.5">
+<input class="w-full text-xs bg-white border border-emerald-300 rounded-lg p-2 text-slate-800" id="relay-safe-time" type="time" value="16:30"/>
+<button class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg whitespace-nowrap" onclick="proposeSafePoint()" type="button">Propose</button>
+</div>
+</div>
+</div>
+<!-- Chat Thread -->
+<div class="flex-1 min-h-[160px] max-h-[200px] overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5" id="relay-thread">
+<div class="flex flex-col items-start max-w-[85%]">
+<span class="text-[10px] font-semibold text-slate-400">Finder (Masked ID: #User419) • 10:45 AM</span>
+<div class="bg-white border border-slate-200 rounded-xl rounded-tl-none p-2 text-xs text-slate-800 shadow-2xs">
+            Hello! I sighted this dog and reported the location. We can arrange safe handover at a verified safe exchange zone.
+          </div>
+</div>
+</div>
+<!-- Quick Message Chips -->
+<div class="flex flex-wrap gap-1">
+<button class="text-[10px] px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 border border-slate-200" onclick="insertRelayText('Hello! Is this item still in your custody?')">"Is this still with you?"</button>
+<button class="text-[10px] px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 border border-slate-200" onclick="insertRelayText('I can provide unique identifying details to verify ownership.')">"I can provide proof of ownership"</button>
+<button class="text-[10px] px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 border border-slate-200" onclick="insertRelayText('Can we meet at a verified safe exchange zone with CCTV?')">"Meet at Safe Zone?"</button>
+</div>
+<form class="relative pt-1" onsubmit="handleSendRelay(event)">
+<input class="w-full text-xs bg-white border border-slate-300 rounded-xl pl-3 pr-20 py-2.5" id="relay-msg-input" placeholder="Type encrypted message (no personal contact needed)..." required="" type="text"/>
+<button class="absolute right-1.5 top-2.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center gap-1" type="submit">
+<i class="w-3 h-3" data-lucide="send"></i> Send
+        </button>
+</form>
+</div>
+</div>
+<!-- =========================================================================
+       MODAL 3: OWNERSHIP PROOF & ESCROW VERIFICATION (Feature 4)
+       ========================================================================= -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" id="claim-modal">
+<div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onclick="closeClaimModal()"></div>
+<div class="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 overflow-hidden z-10 space-y-4 max-h-[92vh] overflow-y-auto">
+<div class="flex items-start justify-between border-b border-slate-100 pb-3">
+<div class="flex items-center gap-2.5">
+<span class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold"><i class="w-4 h-4" data-lucide="badge-check"></i></span>
+<div>
+<h3 class="font-bold text-slate-900 text-base">Claim &amp; Verify Ownership</h3>
+</div>
+</div>
+<button class="text-slate-400 hover:text-slate-600 p-1" onclick="closeClaimModal()"><i class="w-5 h-5" data-lucide="x"></i></button>
+</div>
+<div class="grid grid-cols-3 gap-2 text-center text-xs select-none">
+  <!-- สเต็ป 1: ให้คลิกย้อนกลับมาดูได้ -->
+  <button type="button" id="step-tab-1" onclick="switchClaimStep(1)" class="p-1.5 rounded-lg font-bold transition bg-amber-50 border border-amber-300 text-amber-900 cursor-pointer">
+    1. Submit Proof
+  </button>
+  
+  <!-- สเต็ป 2: ลบ onclick ออก และใส่ cursor-default / pointer-events-none -->
+  <div id="step-tab-2" class="p-1.5 rounded-lg font-medium transition bg-slate-50 border border-slate-200 text-slate-500 cursor-default pointer-events-none">
+    2. AI Cross-Check
+  </div>
+  
+  <!-- สเต็ป 3: ลบ onclick ออก และใส่ cursor-default / pointer-events-none -->
+  <div id="step-tab-3" class="p-1.5 rounded-lg font-medium transition bg-slate-50 border border-slate-200 text-slate-500 cursor-default pointer-events-none">
+    3. Escrow Release
+  </div>
+</div>
+<form class="space-y-3" onsubmit="handleClaimProof(event)">
+  <!-- 1. Dropdown เลือกไอเท็ม -->
+  <div>
+    <label class="block text-xs font-semibold text-slate-700 mb-1" for="claim-item-select">
+      Select Item to Claim / Verify
+    </label>
+    <select 
+      id="claim-item-select" 
+      class="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-medium text-slate-800" 
+      onchange="handleClaimItemChange(this.value)">
+    </select>
+  </div>
+
+  <!-- 2. กล่องกรอกข้อมูลหลักฐาน -->
+  <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5 text-xs">
+    <label class="block font-semibold text-slate-700" for="claim-serial">1. Serial Number, Apple ID Name, or Microchip ID</label>
+    <input class="w-full text-xs bg-white border border-slate-200 rounded-lg p-2 font-mono" id="claim-serial" placeholder="e.g. H2L9, microchip no., or owner name" required="" type="text"/>
+    
+    <label class="block font-semibold text-slate-700 pt-1" for="claim-hidden-detail">2. Distinct hidden mark or collar detail</label>
+    <input class="w-full text-xs bg-white border border-slate-200 rounded-lg p-2" id="claim-hidden-detail" placeholder="e.g. Scratches, inner tag, bell color..." required="" type="text"/>
+  </div>
+
+  <!-- 3. กล่องแจ้งเตือนความสำเร็จ (ใส่ class="hidden" ไว้ตั้งแต่แรก จะแสดงเมื่อกดยืนยันเท่านั้น) -->
+  <div id="claim-success-box" class="hidden bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1.5 text-xs">
+    <div class="flex items-center justify-between font-bold text-emerald-900">
+      <span class="flex items-center gap-1">
+        <i class="w-4 h-4 text-emerald-600" data-lucide="check-check"></i> 
+        <span>Ownership Proof Confirmed!</span>
+      </span>
+      <span id="claim-result-score" class="bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-mono text-[11px]">Score: 98% Match</span>
+    </div>
+    <p id="claim-result-desc" class="text-emerald-800 leading-relaxed"></p>
+  </div>
+
+  <!-- 4. แถบปุ่มด้านล่าง -->
+  <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+    <button class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg" onclick="closeClaimModal()" type="button">Cancel</button>
+    <button class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5" id="claim-sub-btn" type="submit">
+      <i class="w-4 h-4" data-lucide="shield-check"></i> Validate Ownership Proof
+    </button>
+  </div>
+</form>
+</div>
+</div>
+<!-- =========================================================================
+       MODAL 4: AI MATCHING ENGINE COMPARISON
+       ========================================================================= -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" id="ai-modal">
+<div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onclick="closeAIMatchModal()"></div>
+<div class="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full p-5 overflow-hidden z-10 space-y-4 max-h-[92vh] overflow-y-auto">
+<div class="flex items-start justify-between border-b border-slate-100 pb-3">
+<div class="flex items-center gap-2.5">
+<span class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold"><i class="w-4 h-4" data-lucide="cpu"></i></span>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="font-bold text-slate-900 text-base">Smart AI Matching Engine</h3>
+<span id="ai-modal-confidence" class="text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">94% Confidence</span>
+</div>
+<p class="text-xs text-slate-500">Automated cross-referencing of imagery, geographic radius, tags &amp; sighting time.</p>
+</div>
+</div>
+<button class="text-slate-400 hover:text-slate-600 p-1" onclick="closeAIMatchModal()"><i class="w-5 h-5" data-lucide="x"></i></button>
+</div>
+<div class="grid grid-cols-3 gap-2 text-center text-xs">
+  <div class="p-2 bg-blue-50 border border-blue-100 rounded-lg">
+    <span class="text-slate-500 text-[10px] block">Visual Match</span>
+    <strong class="text-blue-900 font-bold text-sm" id="ai-stat-visual">96%</strong>
+  </div>
+  <div class="p-2 bg-emerald-50 border border-emerald-100 rounded-lg">
+    <span class="text-slate-500 text-[10px] block">Proximity</span>
+    <strong class="text-emerald-900 font-bold text-sm" id="ai-stat-dist">0.5 km (94%)</strong>
+  </div>
+  <div class="p-2 bg-amber-50 border border-amber-100 rounded-lg">
+    <span class="text-slate-500 text-[10px] block">Bounty Escrow</span>
+    <strong class="text-amber-900 font-bold text-sm" id="ai-stat-bounty">฿500 Ready</strong>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+  <div class="bg-white p-3 rounded-lg border border-red-200 space-y-1.5 text-xs">
+    <span class="text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded" id="ai-lost-tag">Lost Report #item-1</span>
+    <img id="ai-lost-img" class="w-full h-28 object-cover rounded bg-slate-100" src="https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=400&q=80" alt="Lost pet"/>
+    <h4 class="font-bold text-slate-900" id="ai-lost-title">น้องหมาโกลเด้น (ชื่อคูเปอร์)</h4>
+    <p class="text-slate-600 text-[11px]" id="ai-lost-desc">ปลอกคอสีน้ำเงิน มีกระดิ่ง เป็นมิตรมาก</p>
+  </div>
+
+  <div class="bg-white p-3 rounded-lg border border-blue-200 space-y-1.5 text-xs">
+    <span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">Found Sighting Pin</span>
+    <img id="ai-found-img" class="w-full h-28 object-cover rounded bg-slate-100" src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=400&q=80" alt="Sighting photo"/>
+    <h4 class="font-bold text-slate-900" id="ai-found-title">พบสุนัขพันธุ์โกลเด้นใกล้สวนสาธารณะ</h4>
+    <p class="text-slate-600 text-[11px]" id="ai-found-desc">มีปลอกคอสีน้ำเงินเข้ม พักอยู่แถวริมสระน้ำ</p>
+  </div>
+</div>
+<div class="flex justify-between items-center pt-2 border-t border-slate-100">
+<button class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg" onclick="closeAIMatchModal()">Dismiss</button>
+<div class="flex gap-2">
+<button class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center gap-1" onclick="openRelayModal('item-1', 'Golden Retriever Cooper')">
+<i class="w-3.5 h-3.5 text-blue-600" data-lucide="shield-check"></i> Anonymous Relay
+          </button>
+<button class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1" onclick="confirmAIMatchNotify()">
+<i class="w-3.5 h-3.5" data-lucide="send"></i> Notify Both Parties
+          </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="bg-white border-t border-slate-200 mt-12 py-5 text-center text-xs text-slate-500">
+<div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+<div class="flex items-center gap-1.5">
+<i class="w-4 h-4 text-blue-600" data-lucide="shield-check"></i>
+<span><strong>Lost and Found Hub</strong> • Powered by Leaflet.js &amp; Safe Exchange Custody Network</span>
+</div>
+<div class="flex items-center gap-2.5">
+<button class="text-blue-600 hover:underline font-semibold" onclick="exportJSON()">Export JSON</button>
+<span>•</span>
+<button class="text-blue-600 hover:underline font-semibold" onclick="document.getElementById('import-json-file').click()">Import JSON</button>
+<span>•</span>
+<button class="hover:text-blue-600 underline" onclick="resetToSample()">Reset Sample Data</button>
+</div>
+</div>
+</footer>
+<script src="script.js"></script>
+</body>
+</html>
